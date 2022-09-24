@@ -30,6 +30,7 @@ Usage
 
 For each type definition `t` annotated with the keyword `orm`, a tuple of functions to persist and query the saved values are automatically generated:
 
+```ocaml
     (* User-defined datatype *)
     type t = ... with orm
 
@@ -39,28 +40,34 @@ For each type definition `t` annotated with the keyword `orm`, a tuple of functi
     val t_get: (t, [< `RW | `RO ]) db -> ... -> t list
     val t_save: (t, [ `RW ]) db -> t -> unit
     val t_delete: (t, [ `RW ]) db -> t -> unit
+```
 
 Example
 -------
 
 This example define a basic ML types corresponding to a photo gallery:
 
+```ocaml
     type image = string
     and gallery = {
         name: string;
         date: float;
         contents: image list;
     } with orm
+```
 
 We hold an `image` as a binary string, and a gallery is a named list of images. First, init functions are generated for both `image` and `gallery`:
 
+```ocaml
     val image_init : string -> (image, [ `RW ]) db
     val gallery_init : string -> (gallery, [ `RW ]) db
     val image_init_read_only : string -> (image, [ `RO ]) db
     val gallery_init_read_only : string -> (gallery, [ `RO ]) db
+```
 
 Query functions are generated with signatures matching the various fields in the record or object, for example:
 
+```ocaml
     val gallery_get : (gallery, [< `RO | `RW ]) db ->
         ?name:[ `Eq string | `Contains string] ->
         ?date:[ `Le float | `Ge float | `Eq float | `Neq float] ->
@@ -69,6 +76,7 @@ Query functions are generated with signatures matching the various fields in the
 
     let my_pics db = gallery_get ~name:(`Contains "Anil") db
     let my_pics db = gallery_get ~custom:(fun g -> String.lowercase g.name = "anil") db
+```
 
 To use this, you simply pass the database handle and specify any constraints to the optional variables.  More complex functions can be specified using the `custom` function which filters the full result set (as seen in the second example above).
 
@@ -81,27 +89,34 @@ Intuitively, calling `gallery_init` will:
 
 1. use `dyntype.type-of` to translate the type definitions into:
 
+```ocaml
         let type_of_image = Ext ( "image", String )
         let type_of_gallery =
             Ext("gallery", Dict [ 
                 ("name", String); ("date", Float) ; ("contents", Enum type_of_image)
         ])
+```
 
 2. use some basic inductive rules to generate the database schema:
 
+```ocaml
         CREATE TABLE image (__id__ INTEGER PRIMARY KEY, image TEXT);
         CREATE TABLE gallery (__id__ INTEGER PRIMARY KEY, gallery__name TEXT, 
             gallery__date REAL, gallery__contents__0 INTEGER);
         CREATE TABLE gallery__contents__0 (__id__ INTEGER PRIMARY KEY,  
             __next__ INTEGER, __size__ INTEGER, gallery__contents__0 INTEGER);
+```
 
 Second, using `dyntype.value`, any value of type `image` or `gallery` can be translated into a value of type `Value.t`. Save functions can be then defined with the signature:
 
+```ocaml
     val image_save : (image, [ `RW ]) db -> image -> unit
     val gallery_save : (gallery, [ 'RW ]) db -> gallery -> unit
+```
 
 Finally, using `Dyntype.type-of`, functions to access the database are generated, with the signature:
 
+```ocaml
     val image_get : (image, [< `RO | `RW ]) db ->
         ?value:[`Contains of string | `Eq of string] ] ->
         ?custom:(image -> bool) ->
@@ -112,6 +127,7 @@ Finally, using `Dyntype.type-of`, functions to access the database are generated
         ?date:[ `Le float | `Ge float | `Eq float | `Neq float] ->
         ?custom:(gallery -> bool) ->
         gallery list
+```
 
 For both types, we are generating:
 
